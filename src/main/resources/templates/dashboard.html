@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#090909">
+    <title>EventFlow | Dashboard</title>
+    <link rel="icon" type="image/png" th:href="@{/images/eventflow-favicon.png(v='20260923finalgalleryanalytics')}" href="/images/eventflow-favicon.png?v=20260923finalgalleryanalytics">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" th:href="@{/css/site.css(v='20260923layoutfix3')}" href="/css/site.css?v=20260923layoutfix3">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+</head>
+<body>
+<div th:replace="~{fragments :: topbar}"></div>
+<div class="app-shell">
+    <div th:replace="~{fragments :: sidebar('dashboard')}"></div>
+    <main class="app-main">
+        <section class="page-heading dashboard-heading">
+            <div>
+                <span class="role-label" th:text="${user.role}">PARTICIPANT</span>
+                <h1 th:text="'Welcome back, ' + ${user.fullName}">Welcome back</h1>
+                <p th:if="${user.role == 'PARTICIPANT'}">Keep track of your registrations and discover what is happening next.</p>
+                <p th:if="${user.role == 'ORGANIZER'}">Manage your events, registrations and participant activity from one place.</p>
+                <p th:if="${user.role == 'ADMIN'}">Monitor users, events and registrations across EventFlow.</p>
+            </div>
+            <a class="primary-button" th:if="${user.role == 'ORGANIZER'}" th:href="@{/organizer/events/new}"><i class="bi bi-plus-lg"></i>Create Event</a>
+            <a class="primary-button" th:if="${user.role == 'PARTICIPANT'}" th:href="@{/events}"><i class="bi bi-search"></i>Explore Events</a>
+            <a class="primary-button" th:if="${user.role == 'ADMIN'}" th:href="@{/admin/users}"><i class="bi bi-people"></i>Manage Users</a>
+        </section>
+
+        <section class="metric-grid">
+            <article class="metric-card"><div class="metric-icon"><i class="bi bi-calendar2-event"></i></div><div><span th:text="${metricOneLabel}">Metric</span><strong th:text="${metricOneValue}">0</strong></div></article>
+            <article class="metric-card"><div class="metric-icon"><i class="bi bi-clock-history"></i></div><div><span th:text="${metricTwoLabel}">Metric</span><strong th:text="${metricTwoValue}">0</strong></div></article>
+            <article class="metric-card"><div class="metric-icon"><i class="bi bi-people"></i></div><div><span th:text="${metricThreeLabel}">Metric</span><strong th:text="${metricThreeValue}">0</strong></div></article>
+            <article class="metric-card"><div class="metric-icon"><i class="bi bi-check2-circle"></i></div><div><span th:text="${metricFourLabel}">Metric</span><strong th:text="${metricFourValue}">0</strong></div></article>
+        </section>
+
+
+        <section class="analytics-section" th:if="${(user.role == 'ADMIN' or user.role == 'ORGANIZER') and analytics != null}">
+            <div class="analytics-heading">
+                <div><span class="section-kicker">PERFORMANCE</span><h2>Event Analytics</h2><p th:text="${user.role == 'ADMIN' ? 'Platform-wide event performance and booking insights.' : 'Performance across your events, tickets and participant activity.'}">Analytics</p></div>
+            </div>
+
+            <div class="analytics-kpi-grid">
+                <article class="analytics-kpi"><div class="analytics-kpi-icon"><i class="bi bi-ticket-perforated"></i></div><div><span>Total bookings</span><strong th:text="${analytics.totalBookings}">0</strong><small>Across selected events</small></div></article>
+                <article class="analytics-kpi"><div class="analytics-kpi-icon"><i class="bi bi-pie-chart"></i></div><div><span>Capacity used</span><strong th:text="${analytics.capacityUsagePercent + '%'}">0%</strong><small>Booked seats vs capacity</small></div></article>
+                <article class="analytics-kpi"><div class="analytics-kpi-icon"><i class="bi bi-cash-stack"></i></div><div><span>Ticket value</span><strong th:text="${analytics.formattedTicketValue}">৳0</strong><small th:text="${analytics.couponUses + ' discounted booking(s)'}">0 discounted bookings</small></div></article>
+                <article class="analytics-kpi"><div class="analytics-kpi-icon"><i class="bi bi-star-fill"></i></div><div><span>Average rating</span><strong th:text="${analytics.totalReviews > 0 ? #numbers.formatDecimal(analytics.averageRating,1,1) + '/5' : '—'}">—</strong><small th:text="${analytics.totalReviews + ' participant review(s)'}">0 reviews</small></div></article>
+            </div>
+
+            <div class="analytics-chart-grid">
+                <article class="analytics-chart-card analytics-chart-wide">
+                    <div class="analytics-card-head"><div><span>REGISTRATION TREND</span><h3>Bookings over the last 6 months</h3></div><i class="bi bi-graph-up-arrow"></i></div>
+                    <div class="analytics-chart-wrap"><canvas id="registrationTrendChart"></canvas></div>
+                </article>
+                <article class="analytics-chart-card">
+                    <div class="analytics-card-head"><div><span>EVENT MIX</span><h3>Events by category</h3></div><i class="bi bi-grid"></i></div>
+                    <div class="analytics-chart-wrap compact"><canvas id="categoryChart"></canvas></div>
+                </article>
+                <article class="analytics-chart-card">
+                    <div class="analytics-card-head"><div><span>TOP EVENTS</span><h3>Most booked events</h3></div><i class="bi bi-trophy"></i></div>
+                    <div class="analytics-chart-wrap compact"><canvas id="topEventsChart"></canvas></div>
+                </article>
+                <article class="analytics-chart-card">
+                    <div class="analytics-card-head"><div><span>RATINGS</span><h3>Participant rating distribution</h3></div><i class="bi bi-star"></i></div>
+                    <div class="analytics-rating-bars">
+                        <div th:each="rating,iter : ${analytics.ratingValues}"><span th:text="${5 - iter.index + '★'}">5★</span><div><i th:style="|width:${analytics.totalReviews > 0 ? (rating * 100 / analytics.totalReviews) : 0}%|"></i></div><strong th:text="${rating}">0</strong></div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="dashboard-content-grid">
+            <article class="surface-card large-surface">
+                <div class="surface-heading">
+                    <div><span class="section-kicker" th:text="${user.role == 'PARTICIPANT' ? 'YOUR SCHEDULE' : (user.role == 'ORGANIZER' ? 'YOUR EVENTS' : 'PLATFORM EVENTS')}">EVENTS</span><h2 th:text="${user.role == 'PARTICIPANT' ? 'Upcoming registrations' : (user.role == 'ORGANIZER' ? 'Recent events' : 'Upcoming events')}">Upcoming events</h2></div>
+                    <a th:if="${user.role == 'PARTICIPANT'}" th:href="@{/participant/registrations}">View all</a>
+                    <a th:if="${user.role == 'ORGANIZER'}" th:href="@{/organizer/events}">View all</a>
+                    <a th:if="${user.role == 'ADMIN'}" th:href="@{/admin/events}">View all</a>
+                </div>
+
+                <div class="dashboard-event-list" th:if="${dashboardEvents != null and !#lists.isEmpty(dashboardEvents)}">
+                    <div class="dashboard-event-row" th:each="event : ${dashboardEvents}">
+                        <img th:src="${event.imageUrl != null ? event.imageUrl : '/images/event-visual.png'}" src="/images/event-visual.png" alt="Event image" loading="lazy" decoding="async">
+                        <div class="dashboard-event-main">
+                            <strong th:text="${event.title}">Event title</strong>
+                            <span><i class="bi bi-calendar3"></i><span th:text="${event.formattedDate + ' · ' + event.formattedTime}">Date</span></span>
+                            <span><i class="bi bi-geo-alt"></i><span th:text="${event.location}">Location</span></span>
+                        </div>
+                        <div class="dashboard-event-side">
+                            <span class="status-badge" th:text="${event.status}">UPCOMING</span>
+                            <small th:text="${registrationCounts != null ? registrationCounts[event.id] + ' registered' : event.category}">0 registered</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="clean-empty" th:if="${dashboardEvents == null or #lists.isEmpty(dashboardEvents)}">
+                    <i class="bi bi-calendar2-x"></i><h3>Nothing here yet</h3><p th:if="${user.role == 'PARTICIPANT'}">Register for an event and it will appear here.</p><p th:if="${user.role == 'ORGANIZER'}">Create your first event to start managing registrations.</p>
+                </div>
+            </article>
+
+            <aside class="surface-card quick-panel">
+                <div class="surface-heading"><div><span class="section-kicker">QUICK ACCESS</span><h2>Actions</h2></div></div>
+                <div class="action-list" th:if="${user.role == 'PARTICIPANT'}">
+                    <a th:href="@{/events}"><i class="bi bi-compass"></i><div><strong>Explore events</strong><span>Find upcoming experiences.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/participant/registrations}"><i class="bi bi-ticket-perforated"></i><div><strong>My registrations</strong><span>Review or cancel bookings.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/notifications}"><i class="bi bi-bell"></i><div><strong>Notifications</strong><span>See event updates.</span></div><i class="bi bi-chevron-right"></i></a>
+                </div>
+                <div class="action-list" th:if="${user.role == 'ORGANIZER'}">
+                    <a th:href="@{/organizer/events/new}"><i class="bi bi-plus-square"></i><div><strong>Create event</strong><span>Publish a new event.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/organizer/events}"><i class="bi bi-calendar2-week"></i><div><strong>Manage my events</strong><span>Edit, delete and view participants.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/organizer/bookings}"><i class="bi bi-ticket-perforated"></i><div><strong>Booking management</strong><span>Search and manage participant bookings.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/organizer/coupons}"><i class="bi bi-percent"></i><div><strong>Coupons</strong><span>Create and track event discounts.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/organizer/past-events}"><i class="bi bi-clock-history"></i><div><strong>Past events</strong><span>Review completed event history.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/notifications}"><i class="bi bi-bell"></i><div><strong>Registration alerts</strong><span>See participant activity.</span></div><i class="bi bi-chevron-right"></i></a>
+                </div>
+                <div class="action-list" th:if="${user.role == 'ADMIN'}">
+                    <a th:href="@{/admin/users}"><i class="bi bi-people"></i><div><strong>Manage users</strong><span>Roles, status and accounts.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/admin/events}"><i class="bi bi-calendar-check"></i><div><strong>Manage events</strong><span>Review and manage event records.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/admin/registrations}"><i class="bi bi-ticket-perforated"></i><div><strong>Booking management</strong><span>Search and manage platform bookings.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/admin/coupons}"><i class="bi bi-percent"></i><div><strong>Coupons</strong><span>Manage promotional discounts.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/admin/contact-requests}"><i class="bi bi-chat-left-text"></i><div><strong>Contact requests</strong><span th:text="${newContactRequestCount != null and newContactRequestCount > 0 ? newContactRequestCount + ' new request(s)' : 'Review support requests.'}">Review support requests.</span></div><i class="bi bi-chevron-right"></i></a>
+                    <a th:href="@{/admin/past-events}"><i class="bi bi-clock-history"></i><div><strong>Past events</strong><span>Review completed event history.</span></div><i class="bi bi-chevron-right"></i></a>
+                </div>
+            </aside>
+        </section>
+    </main>
+</div>
+<div th:replace="~{fragments :: toasts}"></div>
+<div th:replace="~{fragments :: confirmModal}"></div>
+
+<script th:if="${analytics != null}" th:inline="javascript">
+    window.eventflowAnalytics = {
+        trendLabels: /*[[${analytics.trendLabels}]]*/ [],
+        trendValues: /*[[${analytics.trendValues}]]*/ [],
+        categoryLabels: /*[[${analytics.categoryLabels}]]*/ [],
+        categoryValues: /*[[${analytics.categoryValues}]]*/ [],
+        topEventLabels: /*[[${analytics.topEventLabels}]]*/ [],
+        topEventValues: /*[[${analytics.topEventValues}]]*/ []
+    };
+</script>
+<script th:src="@{/js/site.js(v='20260923finalgalleryanalytics')}" src="/js/site.js?v=20260923finalgalleryanalytics"></script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#090909">
+    <title>EventFlow | Explore Events</title>
+    <link rel="icon" type="image/png" th:href="@{/images/eventflow-favicon.png(v='20260923ui6')}" href="/images/eventflow-favicon.png?v=20260923ui6">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" th:href="@{/css/site.css(v='20260923ui6')}" href="/css/site.css?v=20260923ui6">
+    <link rel="stylesheet" th:href="@{/css/public.css(v='20260923ui6')}" href="/css/public.css?v=20260923ui6">
+</head>
+<body th:classappend="${isGuest} ? ' public-body' : ''">
+<th:block th:if="${isGuest}"><div th:replace="~{fragments :: publicNav('events')}"></div></th:block>
+<th:block th:unless="${isGuest}"><div th:replace="~{fragments :: topbar}"></div></th:block>
+
+<div th:class="${isGuest} ? 'public-page-shell' : 'app-shell'">
+    <th:block th:unless="${isGuest}"><div th:replace="~{fragments :: sidebar('events')}"></div></th:block>
+    <main th:class="${isGuest} ? 'public-events-main' : 'app-main'">
+        <section class="page-heading explore-heading">
+            <div><span class="section-kicker">DISCOVER</span><h1>Find your next event</h1><p>Search by title, category or location and find the event that fits you.</p></div>
+        </section>
+
+        <section class="filter-bar">
+            <label class="filter-search"><i class="bi bi-search"></i><input id="eventSearch" type="search" placeholder="Search event, location or category..."></label>
+            <label class="filter-select"><i class="bi bi-funnel"></i><select id="categoryFilter"><option value="ALL">All categories</option><option th:each="category : ${categories}" th:value="${category}" th:text="${category}">Technology</option></select></label>
+            <label class="filter-select"><i class="bi bi-ticket-perforated"></i><select id="pricingFilter"><option value="ALL">Free &amp; Paid</option><option value="FREE">Free</option><option value="PAID">Paid</option></select></label>
+            <label class="filter-select"><i class="bi bi-clock-history"></i><select id="eventStatusFilter"><option value="ALL" th:selected="${!isGuest}">All statuses</option><option value="UPCOMING" th:selected="${isGuest}">Upcoming</option><option value="COMPLETED">Completed</option></select></label>
+            <span class="filter-result" id="resultCount" th:text="${initialEventCount + ' events'}">0 events</span>
+        </section>
+
+        <section class="event-browser-grid">
+            <article class="event-browser-card event-card" th:each="event : ${events}"
+                     th:attr="data-title=${event.title},data-category=${event.category},data-location=${event.location},data-date=${event.formattedDate},data-time=${event.formattedTime},data-description=${event.description},data-capacity=${event.capacity},data-organizer=${event.organizerName},data-registered=${registrationCounts[event.id]},data-pricing=${event.paid ? 'PAID' : 'FREE'},data-status=${event.status},data-event-url=${'/events/' + event.id}">
+                <div class="event-card-image">
+                    <img th:src="${event.imageUrl != null ? event.imageUrl : '/images/event-visual.png'}" src="/images/event-visual.png" alt="Event image" loading="lazy" decoding="async">
+                    <span class="category-pill" th:text="${event.category}">Technology</span>
+                    <span class="status-badge event-status" th:text="${event.status}">UPCOMING</span><span class="event-price-badge" th:classappend="${event.paid} ? ' paid' : ' free'" th:text="${event.paid ? event.formattedBasePrice : 'FREE'}">FREE</span>
+                </div>
+                <div class="event-card-content" th:with="summary=${feedbackSummaries[event.id]},types=${ticketTypesByEvent[event.id]}">
+                    <div class="event-title-rating-row">
+                        <h2 th:text="${event.title}">Event title</h2>
+                        <span class="event-rating-chip" th:if="${summary != null and summary.totalReviews > 0}"><i class="bi bi-star-fill"></i><strong th:text="${#numbers.formatDecimal(summary.averageRating, 1, 1)}">4.8</strong><small th:text="${'(' + summary.totalReviews + ')'}">(0)</small></span>
+                    </div>
+                    <div class="event-info-row"><i class="bi bi-calendar3"></i><span th:text="${event.formattedDate + ' · ' + event.formattedTime}">Date</span></div>
+                    <div class="event-info-row"><i class="bi bi-geo-alt"></i><span th:text="${event.location}">Location</span></div>
+                    <div class="capacity-block">
+                        <div><span>Seats filled</span><strong th:text="${registrationCounts[event.id] + ' / ' + event.capacity}">0 / 100</strong></div>
+                        <div class="progress-track"><span th:style="|width:${event.capacity > 0 ? (registrationCounts[event.id] * 100 / event.capacity) : 0}%|"></span></div>
+                    </div>
+                    <div class="event-card-actions">
+                        <button class="secondary-button details-button" type="button"><i class="bi bi-eye"></i>Details</button>
+
+                        <th:block th:if="${isGuest}">
+                            <a class="primary-button compact-button guest-register-action"
+                               th:if="${event.status != 'COMPLETED' and registrationCounts[event.id] < event.capacity}"
+                               th:href="@{/login(redirect=${'/events/' + event.id + '#tickets'})}"><i class="bi bi-box-arrow-in-right"></i>Login to Register</a>
+                            <span class="registered-label details-registered muted" th:if="${event.status == 'COMPLETED' or registrationCounts[event.id] >= event.capacity}" th:text="${event.status == 'COMPLETED' ? 'Completed' : 'Event Full'}">Completed</span>
+                        </th:block>
+
+                        <th:block th:if="${user != null and user.role == 'PARTICIPANT'}">
+                            <span class="registered-label" th:if="${registeredEventIds != null and registeredEventIds.contains(event.id)}"><i class="bi bi-check-circle-fill"></i>Registered</span>
+                            <a class="primary-button compact-button" th:if="${(registeredEventIds == null or !registeredEventIds.contains(event.id)) and types != null and !#lists.isEmpty(types)}" th:href="@{'/events/' + ${event.id} + '#tickets'}"><i class="bi bi-ticket-perforated"></i>Choose Ticket</a>
+                            <form th:if="${(registeredEventIds == null or !registeredEventIds.contains(event.id)) and (types == null or #lists.isEmpty(types))}" th:action="@{'/participant/events/' + ${event.id} + '/register'}" method="post" data-loading>
+                                <button class="primary-button compact-button" type="submit" th:disabled="${registrationCounts[event.id] >= event.capacity or event.status == 'COMPLETED'}"><i class="bi bi-ticket-perforated"></i><span th:text="${registrationCounts[event.id] >= event.capacity ? 'Event Full' : (event.status == 'COMPLETED' ? 'Completed' : (event.paid ? 'Reserve · ' + event.formattedBasePrice : 'Register Free'))}">Register</span></button>
+                            </form>
+                        </th:block>
+                        <a class="secondary-button" th:if="${user != null and user.role == 'ORGANIZER' and event.organizerId == user.id and event.status != 'COMPLETED'}" th:href="@{'/organizer/events/' + ${event.id} + '/edit'}"><i class="bi bi-pencil"></i>Edit</a>
+                        <a class="secondary-button" th:if="${user != null and user.role == 'ADMIN' and event.status != 'COMPLETED'}" th:href="@{'/admin/events/' + ${event.id} + '/edit'}"><i class="bi bi-pencil"></i>Edit</a>
+                    </div>
+                </div>
+            </article>
+        </section>
+        <div class="large-empty filtered-empty" id="emptyState"><div class="empty-icon"><i class="bi bi-search"></i></div><h2>No matching events</h2><p>Try another search, category, pricing or status option.</p></div>
+    </main>
+</div>
+
+<div class="event-modal" id="eventModal" aria-hidden="true">
+    <div class="event-modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <button class="modal-close" id="closeEventModal" type="button"><i class="bi bi-x-lg"></i></button>
+        <span class="category-pill static" id="modalCategory">Event</span><h2 id="modalTitle">Event title</h2><p id="modalDescription"></p>
+        <div class="modal-detail-grid"><div><i class="bi bi-calendar3"></i><span>Date</span><strong id="modalDate"></strong></div><div><i class="bi bi-clock"></i><span>Time</span><strong id="modalTime"></strong></div><div><i class="bi bi-geo-alt"></i><span>Location</span><strong id="modalLocation"></strong></div><div><i class="bi bi-people"></i><span>Capacity</span><strong id="modalCapacity"></strong></div><div><i class="bi bi-person-badge"></i><span>Organizer</span><strong id="modalOrganizer"></strong></div></div>
+        <div class="event-modal-actions"><a class="primary-button" id="modalFullDetails" href="/events"><i class="bi bi-layout-text-sidebar-reverse"></i>Full Event Details</a></div>
+    </div>
+</div>
+<div th:replace="~{fragments :: toasts}"></div><script th:src="@{/js/site.js(v='20260923ui6')}" src="/js/site.js?v=20260923ui6"></script>
+</body>
+</html>

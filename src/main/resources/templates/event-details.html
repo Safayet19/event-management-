@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#090909">
+    <title th:text="'EventFlow | ' + ${event.title}">EventFlow | Event Details</title>
+    <link rel="icon" type="image/png" th:href="@{/images/eventflow-favicon.png(v='20260923public3')}" href="/images/eventflow-favicon.png?v=20260923public3">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" th:href="@{/css/site.css(v='20260923public3')}" href="/css/site.css?v=20260923public3">
+    <link rel="stylesheet" th:href="@{/css/public.css(v='20260923public3')}" href="/css/public.css?v=20260923public3">
+</head>
+<body th:classappend="${isGuest} ? ' public-body' : ''">
+<th:block th:if="${isGuest}"><div th:replace="~{fragments :: publicNav('events')}"></div></th:block>
+<th:block th:unless="${isGuest}"><div th:replace="~{fragments :: topbar}"></div></th:block>
+<div th:class="${isGuest} ? 'public-page-shell' : 'app-shell'">
+    <th:block th:unless="${isGuest}"><div th:replace="~{fragments :: sidebar('events')}"></div></th:block>
+    <main th:class="${isGuest} ? 'public-event-details-main event-details-main' : 'app-main event-details-main'">
+        <a class="event-details-back" th:href="@{/events}"><i class="bi bi-arrow-left"></i>Back to Explore Events</a>
+
+        <section class="event-details-hero">
+            <div class="event-details-cover"><img th:src="${event.imageUrl != null ? event.imageUrl : '/images/event-visual.png'}" alt="Event cover"></div>
+            <div class="event-details-hero-copy">
+                <div class="event-details-tags"><span class="category-pill static" th:text="${event.category}">Technology</span><span class="status-badge" th:text="${event.status}">UPCOMING</span><span class="pricing-pill" th:classappend="${event.paid} ? ' paid' : ' free'" th:text="${event.paid ? event.formattedBasePrice + ' base' : 'Free Event'}">Free Event</span></div>
+                <h1 th:text="${event.title}">Event title</h1>
+                <p th:text="${event.description}">Event description</p>
+                <div class="event-details-meta-grid">
+                    <div><i class="bi bi-calendar3"></i><span>Date</span><strong th:text="${event.formattedDate}">Date</strong></div>
+                    <div><i class="bi bi-clock"></i><span>Starts</span><strong th:text="${event.formattedTime}">Time</strong></div>
+                    <div><i class="bi bi-geo-alt"></i><span>Location</span><strong th:text="${event.location}">Location</strong></div>
+                    <div><i class="bi bi-person-badge"></i><span>Organizer</span><strong th:text="${event.organizerName}">Organizer</strong></div>
+                </div>
+                <div class="event-details-capacity">
+                    <div><span>Registrations</span><strong th:text="${registrationCount + ' / ' + event.capacity}">0 / 100</strong></div>
+                    <div class="progress-track"><span th:style="|width:${event.capacity > 0 ? (registrationCount * 100 / event.capacity) : 0}%|"></span></div>
+                </div>
+                <div class="event-details-actions" id="participant-feedback">
+                    <th:block th:if="${user != null and user.role == 'PARTICIPANT'}">
+                        <span class="registered-label details-registered" th:if="${isRegistered}"><i class="bi bi-check-circle-fill"></i>You are registered</span>
+                        <button class="feedback-open-button" type="button"
+                                th:if="${isRegistered and event.status == 'COMPLETED'}"
+                                th:attr="data-event-id=${event.id},data-event-title=${event.title},data-rating=${myFeedback != null ? myFeedback.rating : 0},data-comment=${myFeedback != null ? myFeedback.comment : ''}">
+                            <i class="bi" th:classappend="${myFeedback != null} ? ' bi-pencil-square' : ' bi-star-fill'"></i>
+                            <span th:text="${myFeedback != null ? 'Edit Feedback · ' + myFeedback.rating + '/5' : 'Rate & Review'}">Rate &amp; Review</span>
+                        </button>
+                        <a class="primary-button" th:if="${!isRegistered and event.status != 'COMPLETED' and registrationCount < event.capacity}" href="#tickets"><i class="bi bi-ticket-perforated"></i>Choose Ticket</a>
+                        <span class="registered-label details-registered muted" th:if="${!isRegistered and (event.status == 'COMPLETED' or registrationCount >= event.capacity)}" th:text="${event.status == 'COMPLETED' ? 'Event completed' : 'Event full'}">Event full</span>
+                    </th:block>
+                    <a class="primary-button" th:if="${user != null and user.role == 'ORGANIZER' and event.organizerId == user.id}" th:href="@{'/organizer/events/' + ${event.id} + '/program'}"><i class="bi bi-sliders"></i><span th:text="${event.status == 'COMPLETED' ? 'View Event Setup' : 'Manage Event Setup'}">Manage Event Setup</span></a>
+                    <a class="primary-button" th:if="${user != null and user.role == 'ADMIN'}" th:href="@{'/admin/events/' + ${event.id} + '/program'}"><i class="bi bi-sliders"></i><span th:text="${event.status == 'COMPLETED' ? 'View Event Setup' : 'Manage Event Setup'}">Manage Event Setup</span></a>
+                    <th:block th:if="${isGuest}">
+                        <a class="primary-button" th:if="${event.status != 'COMPLETED' and registrationCount < event.capacity}" th:href="@{/login(redirect=${'/events/' + event.id + '#tickets'})}"><i class="bi bi-box-arrow-in-right"></i>Login to Register</a>
+                        <a class="secondary-button" th:if="${event.status != 'COMPLETED' and registrationCount < event.capacity}" th:href="@{/register(redirect=${'/events/' + event.id + '#tickets'})}">Sign Up</a>
+                        <span class="registered-label details-registered muted" th:if="${event.status == 'COMPLETED' or registrationCount >= event.capacity}" th:text="${event.status == 'COMPLETED' ? 'Event completed' : 'Event full'}">Event completed</span>
+                    </th:block>
+                </div>
+            </div>
+        </section>
+
+        <section class="event-details-section ticket-public-section" id="tickets">
+            <div class="event-details-section-head">
+                <div><span class="section-kicker">ADMISSION</span><h2>Tickets & Registration</h2><p th:text="${event.paid ? 'Choose the ticket option that fits you.' : 'Reserve your place with the available admission option.'}">Choose a ticket.</p></div>
+                <span class="program-count-badge pricing-badge" th:classappend="${event.paid} ? ' paid' : ' free'" th:text="${event.paid ? 'PAID EVENT' : 'FREE EVENT'}">FREE EVENT</span>
+            </div>
+
+            <div class="guest-registration-callout" th:if="${isGuest and event.status != 'COMPLETED' and registrationCount < event.capacity}">
+                <div><i class="bi bi-lock"></i><div><strong>Sign in to register for this event</strong><p>You can browse all event details as a guest. Login or create an account when you are ready to reserve a ticket.</p></div></div>
+                <div class="guest-registration-actions">
+                    <a class="secondary-button" th:href="@{/login(redirect=${'/events/' + event.id + '#tickets'})}">Login</a>
+                    <a class="primary-button" th:href="@{/register(redirect=${'/events/' + event.id + '#tickets'})}">Sign Up</a>
+                </div>
+            </div>
+
+            <div class="public-ticket-grid" th:if="${!#lists.isEmpty(ticketTypes)}">
+                <article class="public-ticket-card" th:each="ticket : ${ticketTypes}">
+                    <div class="public-ticket-top"><div><span class="ticket-state active">AVAILABLE</span><h3 th:text="${ticket.name}">VIP Pass</h3></div><strong class="public-ticket-price" th:text="${ticket.formattedPrice}">৳500</strong></div>
+                    <p th:if="${ticket.description != null and !ticket.description.isBlank()}" th:text="${ticket.description}">Ticket description</p>
+                    <div class="public-ticket-capacity"><span><i class="bi bi-people"></i><strong th:text="${ticketRegistrationCounts[ticket.id]}">0</strong> booked</span><span th:text="${ticket.capacity - ticketRegistrationCounts[ticket.id] + ' left'}">20 left</span></div>
+                    <div class="progress-track"><span th:style="|width:${ticket.capacity > 0 ? (ticketRegistrationCounts[ticket.id] * 100 / ticket.capacity) : 0}%|"></span></div>
+                    <th:block th:if="${user != null and user.role == 'PARTICIPANT'}">
+                        <span class="registered-label details-registered" th:if="${isRegistered}"><i class="bi bi-check-circle-fill"></i>Already registered</span>
+                        <form th:if="${!isRegistered and event.status != 'COMPLETED'}" class="ticket-registration-form" th:action="@{'/participant/events/' + ${event.id} + '/register'}" method="post" data-loading data-coupon-form th:attr="data-event-id=${event.id},data-ticket-id=${ticket.id}">
+                            <input type="hidden" name="ticketTypeId" th:value="${ticket.id}">
+                            <div class="ticket-coupon-box" th:if="${event.paid}">
+                                <label>Have a promo code?</label>
+                                <div class="ticket-coupon-row"><div class="ticket-coupon-input"><i class="bi bi-tag"></i><input class="coupon-code-input" name="couponCode" type="text" maxlength="20" placeholder="Enter coupon code" autocomplete="off"></div><button class="coupon-apply-button" type="button"><span>Apply</span></button></div>
+                                <div class="coupon-preview-result" aria-live="polite"></div>
+                            </div>
+                            <button class="primary-button ticket-register-button" type="submit" th:disabled="${ticketRegistrationCounts[ticket.id] >= ticket.capacity or registrationCount >= event.capacity or event.status == 'COMPLETED'}"><i class="bi bi-ticket-perforated"></i><span th:text="${ticketRegistrationCounts[ticket.id] >= ticket.capacity ? 'Sold Out' : (event.status == 'COMPLETED' ? 'Event Completed' : 'Reserve ' + ticket.name)}">Reserve Ticket</span></button>
+                        </form>
+                        <span class="registered-label details-registered muted" th:if="${!isRegistered and event.status == 'COMPLETED'}"><i class="bi bi-lock-fill"></i>Registration closed</span>
+                    </th:block>
+                </article>
+            </div>
+
+            <div class="program-empty wide" th:if="${hasCustomTicketTypes and #lists.isEmpty(ticketTypes)}"><div><i class="bi bi-ticket-perforated"></i></div><h3>Ticket registration is paused</h3><p>The organizer has temporarily paused all ticket types for this event.</p></div>
+
+            <div class="public-ticket-grid" th:if="${#lists.isEmpty(ticketTypes) and !hasCustomTicketTypes}">
+                <article class="public-ticket-card featured-ticket">
+                    <div class="public-ticket-top"><div><span class="ticket-state active">GENERAL</span><h3>General Admission</h3></div><strong class="public-ticket-price" th:text="${event.formattedBasePrice}">Free</strong></div>
+                    <p>Standard admission using the event's overall capacity.</p>
+                    <div class="public-ticket-capacity"><span><i class="bi bi-people"></i><strong th:text="${registrationCount}">0</strong> booked</span><span th:text="${event.capacity - registrationCount + ' left'}">50 left</span></div>
+                    <div class="progress-track"><span th:style="|width:${event.capacity > 0 ? (registrationCount * 100 / event.capacity) : 0}%|"></span></div>
+                    <th:block th:if="${user != null and user.role == 'PARTICIPANT'}">
+                        <span class="registered-label details-registered" th:if="${isRegistered}"><i class="bi bi-check-circle-fill"></i>Already registered</span>
+                        <form th:if="${!isRegistered and event.status != 'COMPLETED'}" class="ticket-registration-form" th:action="@{'/participant/events/' + ${event.id} + '/register'}" method="post" data-loading data-coupon-form th:attr="data-event-id=${event.id},data-ticket-id=''">
+                            <div class="ticket-coupon-box" th:if="${event.paid}">
+                                <label>Have a promo code?</label>
+                                <div class="ticket-coupon-row"><div class="ticket-coupon-input"><i class="bi bi-tag"></i><input class="coupon-code-input" name="couponCode" type="text" maxlength="20" placeholder="Enter coupon code" autocomplete="off"></div><button class="coupon-apply-button" type="button"><span>Apply</span></button></div>
+                                <div class="coupon-preview-result" aria-live="polite"></div>
+                            </div>
+                            <button class="primary-button ticket-register-button" type="submit" th:disabled="${registrationCount >= event.capacity or event.status == 'COMPLETED'}"><i class="bi bi-ticket-perforated"></i><span th:text="${registrationCount >= event.capacity ? 'Event Full' : (event.status == 'COMPLETED' ? 'Event Completed' : 'Reserve General Admission')}">Reserve</span></button>
+                        </form>
+                        <span class="registered-label details-registered muted" th:if="${!isRegistered and event.status == 'COMPLETED'}"><i class="bi bi-lock-fill"></i>Registration closed</span>
+                    </th:block>
+                </article>
+            </div>
+        </section>
+
+
+        <section class="event-details-section public-gallery-section" th:if="${gallery != null and !#lists.isEmpty(gallery)}">
+            <div class="event-details-section-head"><div><span class="section-kicker">GALLERY</span><h2>Event Moments</h2><p>Explore photos shared for this event.</p></div><span class="program-count-badge" th:text="${#lists.size(gallery) + (#lists.size(gallery) == 1 ? ' photo' : ' photos')}">0 photos</span></div>
+            <div class="public-gallery-grid">
+                <button class="public-gallery-item" type="button" th:each="photo,iter : ${gallery}" th:attr="data-gallery-index=${iter.index},data-gallery-src=${photo.imageUrl},data-gallery-caption=${photo.caption != null ? photo.caption : ''}">
+                    <img th:src="${photo.imageUrl}" alt="Event gallery photo" loading="lazy" decoding="async">
+                    <span th:if="${photo.caption != null and !photo.caption.isBlank()}" th:text="${photo.caption}">Gallery caption</span>
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </section>
+
+        <section class="event-details-section">
+            <div class="event-details-section-head"><div><span class="section-kicker">PROGRAM</span><h2>Event Schedule</h2><p th:text="${#lists.isEmpty(schedule) ? 'The organizer has not published an agenda yet.' : 'Follow the event session by session.'}">Event schedule</p></div><span class="program-count-badge" th:if="${!#lists.isEmpty(schedule)}" th:text="${#lists.size(schedule) + (#lists.size(schedule) == 1 ? ' session' : ' sessions')}">0 sessions</span></div>
+            <div class="public-agenda" th:if="${!#lists.isEmpty(schedule)}">
+                <article class="public-agenda-item" th:each="item,iter : ${schedule}">
+                    <div class="public-agenda-time"><strong th:text="${item.formattedStartTime}">09:00 AM</strong><span th:text="${item.formattedEndTime}">10:00 AM</span></div>
+                    <div class="public-agenda-line"><span></span></div>
+                    <div class="public-agenda-content"><span class="program-session-number" th:text="${'SESSION ' + (iter.index + 1)}">SESSION 1</span><h3 th:text="${item.title}">Session</h3><div class="program-session-meta"><span th:if="${item.location != null and !item.location.isBlank()}"><i class="bi bi-geo-alt"></i><span th:text="${item.location}">Room</span></span><span th:if="${item.speakerId != null and speakerMap[item.speakerId] != null}"><i class="bi bi-person-mic"></i><span th:text="${speakerMap[item.speakerId].name}">Speaker</span></span></div><p th:if="${item.description != null and !item.description.isBlank()}" th:text="${item.description}">Description</p></div>
+                </article>
+            </div>
+            <div class="program-empty wide" th:if="${#lists.isEmpty(schedule)}"><div><i class="bi bi-calendar2-week"></i></div><h3>Agenda coming soon</h3><p>Check back later for session times and program details.</p></div>
+        </section>
+
+        <section class="event-details-section">
+            <div class="event-details-section-head"><div><span class="section-kicker">PEOPLE</span><h2>Meet the Speakers</h2><p th:text="${#lists.isEmpty(speakers) ? 'Speaker information has not been published yet.' : 'Meet the people presenting and leading the event.'}">Speakers</p></div><span class="program-count-badge" th:if="${!#lists.isEmpty(speakers)}" th:text="${#lists.size(speakers) + (#lists.size(speakers) == 1 ? ' speaker' : ' speakers')}">0 speakers</span></div>
+            <div class="public-speaker-grid" th:if="${!#lists.isEmpty(speakers)}">
+                <article class="public-speaker-card" th:each="speaker : ${speakers}">
+                    <img th:src="${speaker.photoUrl != null ? speaker.photoUrl : '/images/default-avatar.png'}" alt="Speaker photo" loading="lazy" decoding="async">
+                    <div><h3 th:text="${speaker.name}">Speaker Name</h3><strong th:text="${speaker.designation}">Designation</strong><span th:if="${speaker.organization != null and !speaker.organization.isBlank()}" th:text="${speaker.organization}">Organization</span><p th:if="${speaker.bio != null and !speaker.bio.isBlank()}" th:text="${speaker.bio}">Bio</p></div>
+                </article>
+            </div>
+            <div class="program-empty wide" th:if="${#lists.isEmpty(speakers)}"><div><i class="bi bi-person-video3"></i></div><h3>Speakers coming soon</h3><p>The organizer can publish speaker profiles from the event program manager.</p></div>
+        </section>
+
+        <section class="event-details-section public-sponsor-section" th:if="${!#lists.isEmpty(sponsors)}">
+            <div class="event-details-section-head"><div><span class="section-kicker">PARTNERS</span><h2>Event Sponsors</h2><p>Organizations supporting and partnering with this event.</p></div><span class="program-count-badge" th:text="${#lists.size(sponsors) + (#lists.size(sponsors) == 1 ? ' sponsor' : ' sponsors')}">0 sponsors</span></div>
+            <div class="public-sponsor-grid">
+                <article class="public-sponsor-card" th:each="sponsor : ${sponsors}">
+                    <div class="public-sponsor-logo"><img th:if="${sponsor.logoUrl != null and !sponsor.logoUrl.isBlank()}" th:src="${sponsor.logoUrl}" alt="Sponsor logo" loading="lazy" decoding="async"><i th:if="${sponsor.logoUrl == null or sponsor.logoUrl.isBlank()}" class="bi bi-building"></i></div>
+                    <div><span class="sponsor-level" th:classappend="${' level-' + #strings.toLowerCase(sponsor.level)}" th:text="${sponsor.displayLevel}">Gold Sponsor</span><h3 th:text="${sponsor.name}">Sponsor</h3><p th:if="${sponsor.description != null and !sponsor.description.isBlank()}" th:text="${sponsor.description}">Description</p><a th:if="${sponsor.website != null and !sponsor.website.isBlank()}" th:href="${sponsor.website}" target="_blank" rel="noopener">Visit website <i class="bi bi-arrow-up-right"></i></a></div>
+                </article>
+            </div>
+        </section>
+
+        <section class="event-details-section" th:if="${feedbackSummary.totalReviews > 0}">
+            <div class="event-details-section-head"><div><span class="section-kicker">EXPERIENCE</span><h2>Participant Feedback</h2><p>Ratings and comments from registered participants after the event.</p></div><div class="public-rating-summary"><i class="bi bi-star-fill"></i><strong th:text="${#numbers.formatDecimal(feedbackSummary.averageRating, 1, 1)}">4.8</strong><span th:text="${feedbackSummary.totalReviews + (feedbackSummary.totalReviews == 1 ? ' review' : ' reviews')}">0 reviews</span></div></div>
+            <div class="public-review-grid">
+                <article class="public-review-card" th:each="review : ${feedback}"><div class="public-review-top"><div><strong th:text="${review.participantName}">Participant</strong><span th:text="${review.formattedUpdatedAt}">Date</span></div><div class="public-review-rating"><i class="bi bi-star-fill"></i><strong th:text="${review.rating + '/5'}">5/5</strong></div></div><p th:text="${review.comment != null and !review.comment.isBlank() ? review.comment : 'Rated this event without a written comment.'}">Comment</p></article>
+            </div>
+        </section>
+    </main>
+</div>
+
+<div class="feedback-modal" id="feedbackModal" aria-hidden="true" th:if="${user != null and user.role == 'PARTICIPANT' and isRegistered and event.status == 'COMPLETED'}">
+    <div class="feedback-modal-card" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle">
+        <button class="modal-close" id="closeFeedbackModal" type="button" aria-label="Close feedback form"><i class="bi bi-x-lg"></i></button>
+        <span class="section-kicker">EVENT FEEDBACK</span>
+        <h2 id="feedbackModalTitle">Rate your experience</h2>
+        <p id="feedbackEventTitle" class="feedback-event-title" th:text="${event.title}">Event title</p>
+
+        <form id="feedbackForm" th:action="@{'/participant/events/' + ${event.id} + '/feedback'}" method="post" data-loading>
+            <input type="hidden" name="returnTo" th:value="${'/events/' + event.id + '#participant-feedback'}">
+            <input id="feedbackRating" name="rating" type="hidden" th:value="${myFeedback != null ? myFeedback.rating : 0}">
+            <div class="feedback-form-group">
+                <label>Your rating <span>*</span></label>
+                <div class="star-rating-input" id="feedbackStars" role="radiogroup" aria-label="Event rating">
+                    <button type="button" data-rating="1" aria-label="1 star"><i class="bi bi-star-fill"></i></button>
+                    <button type="button" data-rating="2" aria-label="2 stars"><i class="bi bi-star-fill"></i></button>
+                    <button type="button" data-rating="3" aria-label="3 stars"><i class="bi bi-star-fill"></i></button>
+                    <button type="button" data-rating="4" aria-label="4 stars"><i class="bi bi-star-fill"></i></button>
+                    <button type="button" data-rating="5" aria-label="5 stars"><i class="bi bi-star-fill"></i></button>
+                </div>
+                <small class="feedback-rating-label" id="feedbackRatingLabel">Select 1 to 5 stars</small>
+                <small class="feedback-form-error" id="feedbackRatingError"></small>
+            </div>
+            <div class="feedback-form-group">
+                <div class="feedback-label-row"><label for="feedbackComment">Comment <em>Optional</em></label><span id="feedbackCommentCount">0 / 500</span></div>
+                <textarea id="feedbackComment" name="comment" maxlength="500" rows="5" placeholder="Share what you liked or what could be improved..." th:text="${myFeedback != null ? myFeedback.comment : ''}"></textarea>
+            </div>
+            <div class="feedback-modal-actions">
+                <button class="secondary-button" id="feedbackCancel" type="button">Cancel</button>
+                <button class="primary-button" type="submit"><i class="bi bi-send"></i><span id="feedbackSubmitText" th:text="${myFeedback != null ? 'Save Changes' : 'Submit Feedback'}">Submit Feedback</span></button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="gallery-lightbox" id="galleryLightbox" aria-hidden="true">
+    <button class="gallery-lightbox-close" id="galleryLightboxClose" type="button" aria-label="Close gallery"><i class="bi bi-x-lg"></i></button>
+    <button class="gallery-lightbox-nav prev" id="galleryLightboxPrev" type="button" aria-label="Previous image"><i class="bi bi-chevron-left"></i></button>
+    <figure><img id="galleryLightboxImage" src="" alt="Event gallery image"><figcaption id="galleryLightboxCaption"></figcaption></figure>
+    <button class="gallery-lightbox-nav next" id="galleryLightboxNext" type="button" aria-label="Next image"><i class="bi bi-chevron-right"></i></button>
+</div>
+<div th:replace="~{fragments :: toasts}"></div>
+<script th:src="@{/js/site.js(v='20260923public3')}" src="/js/site.js?v=20260923public3"></script>
+</body>
+</html>
